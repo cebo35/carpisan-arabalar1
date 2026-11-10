@@ -1,0 +1,1247 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Çarpışan Arabalar Arena (Bumper Car Battle)</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        * {
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+            box-sizing: border-box;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Inter', sans-serif;
+            background-color: #050811;
+            color: #ffffff;
+        }
+        /* Crisp viewport canvas without any CSS blur filters */
+        #gameCanvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            background-color: #070b16;
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
+            image-rendering: pixelated;
+        }
+        /* Clean Solid Dark HUD Surfaces (NO BLUR FILTERS) */
+        .hud-surface {
+            background-color: rgba(13, 19, 33, 0.92);
+            border: 1.5px solid rgba(255, 255, 255, 0.12);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 4px; }
+    </style>
+</head>
+<body class="bg-slate-950 text-white select-none overflow-hidden">
+
+    <!-- Crisp HTML5 Game Canvas -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- UI OVERLAY: MAIN MENU MODAL -->
+    <div id="menuModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 transition-opacity duration-200">
+        <div class="hud-surface max-w-md w-full p-6 sm:p-8 rounded-3xl text-center relative overflow-hidden">
+            
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-cyan-500/20 text-cyan-400 text-3xl mb-3 border border-cyan-500/40">
+                <i class="fa-solid fa-car-burst"></i>
+            </div>
+
+            <h1 class="text-3xl sm:text-4xl font-black italic tracking-wider bg-gradient-to-r from-cyan-400 via-indigo-400 to-fuchsia-500 bg-clip-text text-transparent mb-1">
+                BUMPER CARS
+            </h1>
+            <p class="text-xs sm:text-sm text-slate-400 mb-6 uppercase tracking-widest font-bold">Çarpışan Araba Arenası</p>
+
+            <!-- Name Input -->
+            <div class="mb-5 text-left">
+                <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">Arabana İsim Ver</label>
+                <div class="relative">
+                    <input type="text" id="playerNameInput" maxlength="14" value="Sürücü" 
+                        class="w-full bg-slate-900 border border-slate-700 focus:border-cyan-400 rounded-xl px-4 py-3 text-white font-bold outline-none transition-all pl-10 focus:ring-2 focus:ring-cyan-500/30">
+                    <i class="fa-solid fa-car-side absolute left-3 top-4 text-slate-500"></i>
+                </div>
+            </div>
+
+            <!-- Car Color Picker -->
+            <div class="mb-6 text-left">
+                <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">Araba Rengi Seç</label>
+                <div class="flex justify-between items-center gap-2" id="colorPicker">
+                    <!-- Color buttons injected by JS -->
+                </div>
+            </div>
+
+            <!-- Play Mode Selection -->
+            <div class="space-y-3">
+                <button id="btnPlayOffline" class="w-full group relative inline-flex items-center justify-center p-0.5 overflow-hidden text-sm font-extrabold rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg shadow-cyan-500/25 active:scale-95 transition-all">
+                    <span class="w-full py-3.5 px-5 rounded-[10px] bg-slate-950/30 flex items-center justify-center gap-3">
+                        <i class="fa-solid fa-robot text-lg text-cyan-400"></i>
+                        <span>ÇEVRİMDIŞI (Botlara Karşı Oyna)</span>
+                    </span>
+                </button>
+
+                <button id="btnPlayOnline" class="w-full group relative inline-flex items-center justify-center p-0.5 overflow-hidden text-sm font-extrabold rounded-xl bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white shadow-lg shadow-fuchsia-500/25 active:scale-95 transition-all">
+                    <span class="w-full py-3.5 px-5 rounded-[10px] bg-slate-950/30 flex items-center justify-center gap-3">
+                        <i class="fa-solid fa-globe text-lg text-fuchsia-400"></i>
+                        <span>ÇEVRİMİÇİ (Canlı Oyuncular)</span>
+                    </span>
+                </button>
+            </div>
+
+            <!-- Controls Quick Tips -->
+            <div class="mt-6 pt-4 border-t border-slate-800 text-left text-xs text-slate-400 space-y-1.5">
+                <p><i class="fa-solid fa-gamepad text-cyan-400 mr-1.5"></i> <strong>Kontroller:</strong> Yön tuşları / WASD veya Dokunmatik Dokunma</p>
+                <p><i class="fa-solid fa-bolt text-amber-400 mr-1.5"></i> <strong>Yem & Bariyer:</strong> Yem topla, gücün yüksekse engelleri kır!</p>
+                <p><i class="fa-solid fa-shield text-emerald-400 mr-1.5"></i> <strong>Çarpışma:</strong> Güçlü olan araba zayıf olanı yutar ve gücünü alır.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- UI OVERLAY: IN-GAME HUD -->
+    <div id="gameHud" class="hidden pointer-events-none fixed inset-0 z-10 flex flex-col justify-between p-4 sm:p-6">
+        <!-- Top Bar: Player Stats & Leaderboard -->
+        <div class="flex justify-between items-start gap-4">
+            <!-- Stats Widget -->
+            <div class="pointer-events-auto hud-surface px-4 py-3 rounded-2xl flex items-center gap-4 border border-slate-700 shadow-xl">
+                <div id="hudColorIndicator" class="w-10 h-10 rounded-xl flex items-center justify-center text-lg font-black shadow-inner">
+                    <i class="fa-solid fa-car"></i>
+                </div>
+                <div>
+                    <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">GÜÇ SEVİYESİ</div>
+                    <div id="hudPowerText" class="text-xl sm:text-2xl font-black text-white tracking-wide">100</div>
+                </div>
+                <div class="h-8 w-[1px] bg-slate-700/80 mx-1"></div>
+                <div>
+                    <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">AV/SKOR</div>
+                    <div id="hudKillsText" class="text-lg font-black text-cyan-400">0</div>
+                </div>
+            </div>
+
+            <!-- Leaderboard Widget -->
+            <div class="pointer-events-auto hud-surface p-3 sm:p-4 rounded-2xl w-48 sm:w-60 border border-slate-700 shadow-xl">
+                <div class="flex items-center justify-between mb-2 pb-1 border-b border-slate-700/50">
+                    <span class="text-xs font-black tracking-wider uppercase text-slate-300 flex items-center gap-1.5">
+                        <i class="fa-solid fa-trophy text-amber-400"></i> LİDER TABLOSU
+                    </span>
+                    <span id="hudOnlineModeBadge" class="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 uppercase">BOT</span>
+                </div>
+                <div id="leaderboardList" class="space-y-1 text-xs">
+                    <!-- Dynamic Leaderboard Entries -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Center Top Kill Feed Announcements -->
+        <div id="killFeed" class="absolute top-20 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 pointer-events-none">
+            <!-- Dynamic kill messages -->
+        </div>
+
+        <!-- Bottom Controls & Minimap -->
+        <div class="flex justify-between items-end gap-4">
+            <!-- Left Side: Touch Virtual Joystick Zone (Mobile) -->
+            <div class="relative w-36 h-36 sm:w-44 sm:h-44 pointer-events-auto">
+                <div id="joystickZone" class="w-full h-full rounded-full border-2 border-white/20 bg-slate-900/60 relative flex items-center justify-center shadow-2xl">
+                    <div id="joystickKnob" class="w-14 h-14 rounded-full bg-cyan-500 border-2 border-white shadow-lg shadow-cyan-500/50 absolute transition-transform duration-75"></div>
+                </div>
+            </div>
+
+            <!-- Right Side: Minimap & Nitro Boost Button -->
+            <div class="flex flex-col items-end gap-3 pointer-events-auto">
+                <!-- Minimap Container -->
+                <div class="hud-surface p-1.5 rounded-2xl border border-slate-700 shadow-xl relative overflow-hidden">
+                    <canvas id="minimapCanvas" width="130" height="130" class="rounded-xl bg-slate-950"></canvas>
+                </div>
+
+                <!-- Nitro Boost Button -->
+                <button id="btnNitro" class="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-amber-400 to-orange-600 text-white font-black text-sm sm:text-base shadow-xl shadow-orange-500/30 border-2 border-amber-200 active:scale-90 transition-transform flex flex-col items-center justify-center gap-0.5">
+                    <i class="fa-solid fa-bolt text-lg sm:text-xl"></i>
+                    <span class="text-[9px] uppercase tracking-wider font-extrabold">NİTRO</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- UI OVERLAY: GAME OVER MODAL -->
+    <div id="gameOverModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/95">
+        <div class="hud-surface max-w-sm w-full p-6 sm:p-8 rounded-3xl text-center border border-slate-700 shadow-2xl relative">
+            <div class="w-16 h-16 bg-rose-500/20 border border-rose-500/40 rounded-full flex items-center justify-center mx-auto mb-4 text-rose-400 text-3xl">
+                <i class="fa-solid fa-car-burst"></i>
+            </div>
+            <h2 class="text-2xl font-black text-white mb-1 uppercase tracking-wide">ARABAN ELENDİ!</h2>
+            <p id="gameOverReason" class="text-xs text-slate-400 mb-6">Daha güçlü bir arabaya çarptın!</p>
+
+            <div class="bg-slate-900 rounded-2xl p-4 mb-6 space-y-2 border border-slate-800">
+                <div class="flex justify-between text-xs">
+                    <span class="text-slate-400 font-semibold">Ulaşılan Maksimum Güç:</span>
+                    <span id="statFinalPower" class="font-bold text-amber-400">0</span>
+                </div>
+                <div class="flex justify-between text-xs">
+                    <span class="text-slate-400 font-semibold">Yok Edilen Sürücüler:</span>
+                    <span id="statFinalKills" class="font-bold text-cyan-400">0</span>
+                </div>
+            </div>
+
+            <button id="btnRestart" class="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 font-bold text-white shadow-lg shadow-cyan-500/30 active:scale-95 transition-all">
+                TEKRAR OYNA
+            </button>
+        </div>
+    </div>
+
+    <!-- Firebase Modular Setup for Optional Multiplayer -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        let db = null;
+        let auth = null;
+        let onlineUser = null;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'bumper-car-default';
+
+        try {
+            if (typeof __firebase_config !== 'undefined') {
+                const firebaseConfig = JSON.parse(__firebase_config);
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    signInWithCustomToken(auth, __initial_auth_token)
+                        .then(userCredential => { onlineUser = userCredential.user; })
+                        .catch(() => signInAnonymously(auth).then(u => onlineUser = u.user));
+                } else {
+                    signInAnonymously(auth).then(u => onlineUser = u.user);
+                }
+            }
+        } catch (e) {
+            console.warn("Firebase online mode skipped, falling back to local bot arena:", e);
+        }
+
+        window.OnlineEngine = {
+            db,
+            appId,
+            getUser: () => auth?.currentUser || onlineUser,
+            isAvailable: () => !!db
+        };
+    </script>
+
+    <!-- CORE HTML5 CANVAS GAME ENGINE -->
+    <script>
+        /* ==========================================================================
+           1. AUDIO SYNTHESIZER (Web Audio API)
+           ========================================================================== */
+        const SoundFX = {
+            ctx: null,
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    if (AudioContext) this.ctx = new AudioContext();
+                }
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            },
+            playEat() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(450, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(900, this.ctx.currentTime + 0.07);
+                gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.07);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.07);
+            },
+            playBounce() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(160, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(60, this.ctx.currentTime + 0.14);
+                gain.gain.setValueAtTime(0.25, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.14);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.14);
+            },
+            playSmash() {
+                if (!this.ctx) return;
+                const bufferSize = this.ctx.sampleRate * 0.18;
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+                const noise = this.ctx.createBufferSource();
+                noise.buffer = buffer;
+                const gain = this.ctx.createGain();
+                gain.gain.setValueAtTime(0.35, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.18);
+                noise.connect(gain);
+                gain.connect(this.ctx.destination);
+                noise.start();
+            },
+            playEliminated() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(320, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(70, this.ctx.currentTime + 0.35);
+                gain.gain.setValueAtTime(0.35, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.35);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.35);
+            }
+        };
+
+        /* ==========================================================================
+           2. GAME WORLD CONSTANTS & COLOR PALETTE
+           ========================================================================== */
+        const WORLD_SIZE = 4000; // Expanded Arena size (4000x4000)
+        const CAR_COLORS = [
+            { id: 'cyan', hex: '#06b6d4', glow: '#67e8f9' },
+            { id: 'fuchsia', hex: '#d946ef', glow: '#f0abfc' },
+            { id: 'emerald', hex: '#10b981', glow: '#6ee7b7' },
+            { id: 'amber', hex: '#f59e0b', glow: '#fcd34d' },
+            { id: 'rose', hex: '#f43f5e', glow: '#fda4af' },
+            { id: 'indigo', hex: '#6366f1', glow: '#a5b4fc' }
+        ];
+
+        /* ==========================================================================
+           3. CANVAS SETUP & HIGH-DPI SCALING
+           ========================================================================== */
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const minimapCanvas = document.getElementById('minimapCanvas');
+        const minimapCtx = minimapCanvas.getContext('2d');
+
+        let devicePixelRatioScale = 1;
+
+        function resizeCanvas() {
+            devicePixelRatioScale = Math.max(1, window.devicePixelRatio || 1);
+            
+            // Set Canvas Internal Buffer Dimensions for ultra-sharp Retina rendering
+            canvas.width = Math.floor(window.innerWidth * devicePixelRatioScale);
+            canvas.height = Math.floor(window.innerHeight * devicePixelRatioScale);
+            
+            // Set Display Style Dimensions
+            canvas.style.width = window.innerWidth + 'px';
+            canvas.style.height = window.innerHeight + 'px';
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        /* ==========================================================================
+           4. GAME STATE VARIABLES
+           ========================================================================== */
+        let isOnlineMode = false;
+        let isGameActive = false;
+        let selectedColor = CAR_COLORS[0];
+        let localPlayer = null;
+        let players = [];
+        let foods = [];
+        let barriers = [];
+        let particles = [];
+        let camera = { x: 0, y: 0 };
+        let maxPowerAchieved = 100;
+        let firestoreUnsub = null;
+        let lastSyncTime = 0;
+
+        // Input Controls Tracking
+        const keys = {};
+        const touchInput = { active: false, x: 0, y: 0, angle: 0, dist: 0 };
+        let isNitroActive = false;
+
+        /* ==========================================================================
+           5. COLOR PICKER SETUP
+           ========================================================================== */
+        const colorPickerContainer = document.getElementById('colorPicker');
+        CAR_COLORS.forEach((col, idx) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = `w-9 h-9 rounded-xl transition-all border-2 flex items-center justify-center ${idx === 0 ? 'border-white scale-110 shadow-lg' : 'border-transparent opacity-70'}`;
+            btn.style.backgroundColor = col.hex;
+            btn.onclick = () => {
+                Array.from(colorPickerContainer.children).forEach(c => {
+                    c.classList.remove('border-white', 'scale-110', 'shadow-lg');
+                    c.classList.add('border-transparent', 'opacity-70');
+                });
+                btn.classList.remove('border-transparent', 'opacity-70');
+                btn.classList.add('border-white', 'scale-110', 'shadow-lg');
+                selectedColor = col;
+            };
+            colorPickerContainer.appendChild(btn);
+        });
+
+        /* ==========================================================================
+           6. BUMPER CAR CLASS
+           ========================================================================== */
+        class Car {
+            constructor(id, name, colorObj, x, y, isBot = false, isLocal = false) {
+                this.id = id;
+                this.name = name || 'Sürücü';
+                this.color = colorObj;
+                this.x = x;
+                this.y = y;
+                this.vx = 0;
+                this.vy = 0;
+                this.angle = Math.random() * Math.PI * 2;
+                this.targetAngle = this.angle;
+                this.power = 100;
+                this.isBot = isBot;
+                this.isLocal = isLocal;
+                this.kills = 0;
+                this.botTimer = 0;
+                this.botTarget = null;
+            }
+
+            get radius() {
+                // Scaling radius based on accumulated power
+                return Math.min(115, 24 + Math.sqrt(this.power) * 1.85);
+            }
+
+            get maxSpeed() {
+                const base = 5.4 - (this.radius * 0.016);
+                return Math.max(2.8, base);
+            }
+
+            update() {
+                if (this.isLocal) {
+                    this.handleLocalInput();
+                } else if (this.isBot) {
+                    this.handleBotAI();
+                }
+
+                let speedLimit = this.maxSpeed;
+                if (this.isLocal && isNitroActive) {
+                    speedLimit *= 1.65;
+                    if (Math.random() < 0.4) {
+                        spawnBoostParticle(this.x, this.y, this.angle, this.color.glow);
+                    }
+                }
+
+                // Angle interpolation
+                let diff = this.targetAngle - this.angle;
+                while (diff < -Math.PI) diff += Math.PI * 2;
+                while (diff > Math.PI) diff -= Math.PI * 2;
+                this.angle += diff * 0.16;
+
+                // Propulsion
+                const accel = 0.45;
+                this.vx += Math.cos(this.angle) * accel;
+                this.vy += Math.sin(this.angle) * accel;
+
+                // Speed limit clamp
+                const speed = Math.hypot(this.vx, this.vy);
+                if (speed > speedLimit) {
+                    this.vx = (this.vx / speed) * speedLimit;
+                    this.vy = (this.vy / speed) * speedLimit;
+                }
+
+                // Damping friction
+                this.vx *= 0.94;
+                this.vy *= 0.94;
+
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Boundary Bounce
+                const margin = this.radius;
+                if (this.x < margin) {
+                    this.x = margin;
+                    this.vx = Math.abs(this.vx) * 0.7;
+                }
+                if (this.x > WORLD_SIZE - margin) {
+                    this.x = WORLD_SIZE - margin;
+                    this.vx = -Math.abs(this.vx) * 0.7;
+                }
+                if (this.y < margin) {
+                    this.y = margin;
+                    this.vy = Math.abs(this.vy) * 0.7;
+                }
+                if (this.y > WORLD_SIZE - margin) {
+                    this.y = WORLD_SIZE - margin;
+                    this.vy = -Math.abs(this.vy) * 0.7;
+                }
+            }
+
+            handleLocalInput() {
+                let dx = 0;
+                let dy = 0;
+
+                if (keys['KeyW'] || keys['ArrowUp']) dy -= 1;
+                if (keys['KeyS'] || keys['ArrowDown']) dy += 1;
+                if (keys['KeyA'] || keys['ArrowLeft']) dx -= 1;
+                if (keys['KeyD'] || keys['ArrowRight']) dx += 1;
+
+                if (touchInput.active && touchInput.dist > 5) {
+                    dx = Math.cos(touchInput.angle);
+                    dy = Math.sin(touchInput.angle);
+                }
+
+                if (dx !== 0 || dy !== 0) {
+                    this.targetAngle = Math.atan2(dy, dx);
+                }
+            }
+
+            handleBotAI() {
+                this.botTimer--;
+                if (this.botTimer <= 0 || !this.botTarget) {
+                    this.botTimer = Math.floor(50 + Math.random() * 100);
+
+                    let nearestTarget = null;
+                    let minDist = 700;
+
+                    // Look for weaker players to attack
+                    for (let p of players) {
+                        if (p !== this && p.power < this.power * 0.95) {
+                            const d = Math.hypot(p.x - this.x, p.y - this.y);
+                            if (d < minDist) {
+                                minDist = d;
+                                nearestTarget = p;
+                            }
+                        }
+                    }
+
+                    // Otherwise target food
+                    if (!nearestTarget) {
+                        for (let f of foods) {
+                            const d = Math.hypot(f.x - this.x, f.y - this.y);
+                            if (d < 400) {
+                                minDist = d;
+                                nearestTarget = f;
+                                break;
+                            }
+                        }
+                    }
+
+                    this.botTarget = nearestTarget;
+                }
+
+                if (this.botTarget) {
+                    this.targetAngle = Math.atan2(this.botTarget.y - this.y, this.botTarget.x - this.x);
+                } else if (Math.random() < 0.04) {
+                    this.targetAngle += (Math.random() - 0.5);
+                }
+            }
+
+            draw(ctx) {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+
+                // 1. Thick Rubber Bumper Edge
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = '#1e293b';
+                ctx.fill();
+                ctx.lineWidth = 4;
+                ctx.strokeStyle = this.color.hex;
+                ctx.stroke();
+
+                // 2. Car Chassis (Rotated)
+                ctx.rotate(this.angle);
+
+                // Main body shape
+                ctx.beginPath();
+                ctx.roundRect(-this.radius * 0.65, -this.radius * 0.48, this.radius * 1.3, this.radius * 0.96, 8);
+                ctx.fillStyle = this.color.hex;
+                ctx.fill();
+
+                // Front Headlights
+                ctx.fillStyle = '#fef08a';
+                ctx.beginPath();
+                ctx.arc(this.radius * 0.55, -this.radius * 0.32, 4.5, 0, Math.PI * 2);
+                ctx.arc(this.radius * 0.55, this.radius * 0.32, 4.5, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Direction Indicator Arrow
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.moveTo(this.radius * 0.4, 0);
+                ctx.lineTo(-this.radius * 0.1, -this.radius * 0.25);
+                ctx.lineTo(-this.radius * 0.1, this.radius * 0.25);
+                ctx.closePath();
+                ctx.fill();
+
+                // Windshield Cockpit
+                ctx.fillStyle = '#0f172a';
+                ctx.beginPath();
+                ctx.roundRect(-this.radius * 0.25, -this.radius * 0.3, this.radius * 0.4, this.radius * 0.6, 4);
+                ctx.fill();
+
+                ctx.restore();
+
+                // 3. Crisp Name Tag & Power Badge
+                ctx.save();
+                ctx.translate(this.x, this.y - this.radius - 14);
+
+                ctx.font = '800 12px Inter, sans-serif';
+                const labelText = `${this.name} [${Math.floor(this.power)}]`;
+                const textWidth = ctx.measureText(labelText).width;
+
+                ctx.fillStyle = '#0f172a';
+                ctx.beginPath();
+                ctx.roundRect(-textWidth / 2 - 8, -12, textWidth + 16, 20, 6);
+                ctx.fill();
+                ctx.strokeStyle = this.color.hex;
+                ctx.lineWidth = 1.8;
+                ctx.stroke();
+
+                ctx.fillStyle = '#ffffff';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(labelText, 0, -1);
+                ctx.restore();
+            }
+        }
+
+        /* ==========================================================================
+           7. BARRIERS & FOOD ENTITIES
+           ========================================================================== */
+        class Barrier {
+            constructor(id, x, y, width, height, strength) {
+                this.id = id;
+                this.x = x;
+                this.y = y;
+                this.width = width;
+                this.height = height;
+                this.strength = strength;
+            }
+
+            draw(ctx) {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+
+                // Heavy Industrial Barrier Body
+                ctx.fillStyle = '#1e1b4b';
+                ctx.beginPath();
+                ctx.roundRect(-this.width / 2, -this.height / 2, this.width, this.height, 10);
+                ctx.fill();
+
+                ctx.lineWidth = 3.5;
+                ctx.strokeStyle = '#f43f5e';
+                ctx.stroke();
+
+                // Diagonal warning lines
+                ctx.strokeStyle = 'rgba(244, 63, 94, 0.4)';
+                ctx.lineWidth = 2.5;
+                ctx.beginPath();
+                ctx.moveTo(-this.width / 3, -this.height / 2);
+                ctx.lineTo(this.width / 3, this.height / 2);
+                ctx.stroke();
+
+                // Strength Badge Text
+                ctx.fillStyle = '#fda4af';
+                ctx.font = '800 13px Inter, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(`🛡️ ${Math.floor(this.strength)}`, 0, 0);
+
+                ctx.restore();
+            }
+        }
+
+        class Food {
+            constructor(x, y, isMega = false) {
+                this.x = x;
+                this.y = y;
+                this.isMega = isMega;
+                this.value = isMega ? Math.floor(25 + Math.random() * 35) : Math.floor(4 + Math.random() * 6);
+                this.radius = isMega ? 9.5 : 5.5;
+                this.color = isMega ? '#fbbf24' : CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)].hex;
+                this.pulseAngle = Math.random() * Math.PI * 2;
+            }
+
+            draw(ctx) {
+                this.pulseAngle += 0.06;
+                const scale = 1 + Math.sin(this.pulseAngle) * 0.14;
+
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.scale(scale, scale);
+
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.restore();
+            }
+        }
+
+        /* ==========================================================================
+           8. PARTICLE SYSTEM
+           ========================================================================== */
+        function spawnParticles(x, y, color, count = 10) {
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 1.5 + Math.random() * 5.5;
+                particles.push({
+                    x, y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    life: 1.0,
+                    decay: 0.03 + Math.random() * 0.03,
+                    color: color,
+                    size: 3.5 + Math.random() * 4.5
+                });
+            }
+        }
+
+        function spawnBoostParticle(x, y, angle, color) {
+            const backAngle = angle + Math.PI + (Math.random() - 0.5) * 0.5;
+            particles.push({
+                x: x + Math.cos(angle + Math.PI) * 22,
+                y: y + Math.sin(angle + Math.PI) * 22,
+                vx: Math.cos(backAngle) * 3.5,
+                vy: Math.sin(backAngle) * 3.5,
+                life: 0.8,
+                decay: 0.07,
+                color: color,
+                size: 5.5
+            });
+        }
+
+        function updateParticles() {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= p.decay;
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+        }
+
+        function drawParticles(ctx) {
+            for (let p of particles) {
+                ctx.save();
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        /* ==========================================================================
+           9. WORLD INITIALIZATION
+           ========================================================================== */
+        function initWorld() {
+            foods = [];
+            barriers = [];
+            particles = [];
+
+            // Spawn Food Gems across Map
+            for (let i = 0; i < 450; i++) {
+                foods.push(new Food(
+                    120 + Math.random() * (WORLD_SIZE - 240),
+                    120 + Math.random() * (WORLD_SIZE - 240)
+                ));
+            }
+
+            // Spawn Obstacle Barriers
+            const barrierConfigs = [
+                { x: 1000, y: 1000, w: 220, h: 70, str: 180 },
+                { x: 3000, y: 1000, w: 70, h: 220, str: 220 },
+                { x: 2000, y: 2000, w: 260, h: 260, str: 450 }, // Central Fortress Barrier
+                { x: 1000, y: 3000, w: 240, h: 70, str: 160 },
+                { x: 3000, y: 3000, w: 220, h: 70, str: 280 },
+                { x: 2000, y: 800, w: 160, h: 160, str: 200 },
+                { x: 2000, y: 3200, w: 160, h: 160, str: 200 }
+            ];
+
+            barrierConfigs.forEach((b, idx) => {
+                barriers.push(new Barrier(`b_${idx}`, b.x, b.y, b.w, b.h, b.str));
+            });
+        }
+
+        /* ==========================================================================
+           10. PHYSICS & COLLISION RESOLUTION
+           ========================================================================== */
+        function handleCollisions() {
+            // A. CAR vs FOOD
+            for (let c of players) {
+                for (let i = foods.length - 1; i >= 0; i--) {
+                    const f = foods[i];
+                    const dist = Math.hypot(c.x - f.x, c.y - f.y);
+                    if (dist < c.radius + f.radius) {
+                        c.power += f.value;
+                        if (c.isLocal) {
+                            SoundFX.playEat();
+                            if (c.power > maxPowerAchieved) maxPowerAchieved = Math.floor(c.power);
+                        }
+                        foods.splice(i, 1);
+                        foods.push(new Food(
+                            120 + Math.random() * (WORLD_SIZE - 240),
+                            120 + Math.random() * (WORLD_SIZE - 240)
+                        ));
+                    }
+                }
+            }
+
+            // B. CAR vs BARRIERS
+            for (let c of players) {
+                for (let i = barriers.length - 1; i >= 0; i--) {
+                    const b = barriers[i];
+                    const closestX = Math.max(b.x - b.width / 2, Math.min(c.x, b.x + b.width / 2));
+                    const closestY = Math.max(b.y - b.height / 2, Math.min(c.y, b.y + b.height / 2));
+                    const distX = c.x - closestX;
+                    const distY = c.y - closestY;
+                    const distance = Math.hypot(distX, distY);
+
+                    if (distance < c.radius) {
+                        if (c.power >= b.strength) {
+                            // CAR SHATTERS BARRIER INTO GOLDEN FOODS!
+                            SoundFX.playSmash();
+                            spawnParticles(b.x, b.y, '#f43f5e', 28);
+                            for (let k = 0; k < 14; k++) {
+                                const angle = Math.random() * Math.PI * 2;
+                                const spread = 30 + Math.random() * 90;
+                                foods.push(new Food(b.x + Math.cos(angle) * spread, b.y + Math.sin(angle) * spread, true));
+                            }
+                            announceFeed(`💥 ${c.name} engeli parçaladı!`);
+                            barriers.splice(i, 1);
+                        } else {
+                            // CAR BOUNCES BACK FROM STRONG BARRIER
+                            SoundFX.playBounce();
+                            spawnParticles(closestX, closestY, '#fda4af', 8);
+
+                            const overlap = c.radius - distance;
+                            const nx = distance === 0 ? 1 : distX / distance;
+                            const ny = distance === 0 ? 0 : distY / distance;
+
+                            c.x += nx * (overlap + 2);
+                            c.y += ny * (overlap + 2);
+                            c.vx = nx * 8.5;
+                            c.vy = ny * 8.5;
+                        }
+                    }
+                }
+            }
+
+            // C. CAR vs CAR PVP / PVE BUMPER IMPACTS
+            for (let i = 0; i < players.length; i++) {
+                for (let j = i + 1; j < players.length; j++) {
+                    const c1 = players[i];
+                    const c2 = players[j];
+
+                    const dx = c2.x - c1.x;
+                    const dy = c2.y - c1.y;
+                    const dist = Math.hypot(dx, dy);
+                    const minDist = c1.radius + c2.radius;
+
+                    if (dist < minDist) {
+                        // Elastic Bumper Impulse Rebound
+                        const overlap = minDist - dist;
+                        const nx = dx / (dist || 1);
+                        const ny = dy / (dist || 1);
+
+                        c1.x -= nx * overlap * 0.5;
+                        c1.y -= ny * overlap * 0.5;
+                        c2.x += nx * overlap * 0.5;
+                        c2.y += ny * overlap * 0.5;
+
+                        c1.vx = -nx * 7.5;
+                        c1.vy = -ny * 7.5;
+                        c2.vx = nx * 7.5;
+                        c2.vy = ny * 7.5;
+
+                        SoundFX.playBounce();
+                        spawnParticles((c1.x + c2.x) / 2, (c1.y + c2.y) / 2, '#ffffff', 12);
+
+                        // Check Power Absorption Rule
+                        const powerRatio = c1.power / c2.power;
+                        if (powerRatio > 1.08) {
+                            c1.power += c2.power; // Absorbs initial power of victim
+                            c1.kills++;
+                            announceFeed(`⚔️ ${c1.name}, ${c2.name} arabasını yuttu! (+${Math.floor(c2.power)} Güç)`);
+                            eliminateCar(c2, c1);
+                        } else if (powerRatio < 0.92) {
+                            c2.power += c1.power; // Absorbs initial power of victim
+                            c2.kills++;
+                            announceFeed(`⚔️ ${c2.name}, ${c1.name} arabasını yuttu! (+${Math.floor(c1.power)} Güç)`);
+                            eliminateCar(c1, c2);
+                        }
+                    }
+                }
+            }
+        }
+
+        /* ==========================================================================
+           11. CAR ELIMINATION
+           ========================================================================== */
+        function eliminateCar(victim, attacker) {
+            spawnParticles(victim.x, victim.y, victim.color.hex, 32);
+
+            if (victim.isLocal) {
+                SoundFX.playEliminated();
+                isGameActive = false;
+                document.getElementById('statFinalPower').innerText = Math.floor(maxPowerAchieved);
+                document.getElementById('statFinalKills').innerText = victim.kills;
+                document.getElementById('gameOverReason').innerText = `${attacker.name} arabası seni yuttu!`;
+                document.getElementById('gameOverModal').classList.remove('hidden');
+
+                if (isOnlineMode && window.OnlineEngine?.isAvailable()) {
+                    const u = window.OnlineEngine.getUser();
+                    if (u) {
+                        deleteDoc(doc(window.OnlineEngine.db, 'artifacts', window.OnlineEngine.appId, 'public', 'data', 'players', u.uid)).catch(() => {});
+                    }
+                }
+            }
+
+            players = players.filter(p => p !== victim);
+
+            if (!isOnlineMode && players.length < 9) {
+                setTimeout(() => { if (isGameActive) spawnBot(); }, 2500);
+            }
+        }
+
+        function spawnBot() {
+            const botNames = ['TurboBot', 'Viper', 'BumperKing', 'NitroX', 'CyberRacer', 'Shadow', 'Apex', 'Titan'];
+            const randomName = botNames[Math.floor(Math.random() * botNames.length)] + '#' + Math.floor(Math.random() * 99);
+            const randomColor = CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)];
+            const bot = new Car(
+                'bot_' + Math.random().toString(36).substring(2, 9),
+                randomName,
+                randomColor,
+                300 + Math.random() * (WORLD_SIZE - 600),
+                300 + Math.random() * (WORLD_SIZE - 600),
+                true,
+                false
+            );
+            bot.power = 75 + Math.random() * 90;
+            players.push(bot);
+        }
+
+        /* ==========================================================================
+           12. ONLINE SYNC (FIRESTORE)
+           ========================================================================== */
+        function setupOnlineMultiplayer() {
+            if (!window.OnlineEngine?.isAvailable()) {
+                startOfflineMode();
+                return;
+            }
+
+            const db = window.OnlineEngine.db;
+            const appId = window.OnlineEngine.appId;
+            const user = window.OnlineEngine.getUser();
+            if (!user) {
+                setTimeout(setupOnlineMultiplayer, 500);
+                return;
+            }
+
+            const playersColRef = collection(db, 'artifacts', appId, 'public', 'data', 'players');
+            firestoreUnsub = onSnapshot(playersColRef, (snapshot) => {
+                const onlineData = [];
+                snapshot.forEach(docSnap => {
+                    const data = docSnap.data();
+                    if (data.id !== localPlayer.id) onlineData.push(data);
+                });
+
+                onlineData.forEach(remote => {
+                    let existing = players.find(p => p.id === remote.id);
+                    if (existing) {
+                        existing.x += (remote.x - existing.x) * 0.3;
+                        existing.y += (remote.y - existing.y) * 0.3;
+                        existing.angle = remote.angle;
+                        existing.power = remote.power;
+                    } else {
+                        const newCar = new Car(remote.id, remote.name, remote.color, remote.x, remote.y, false, false);
+                        newCar.power = remote.power;
+                        players.push(newCar);
+                    }
+                });
+
+                const activeRemoteIds = new Set(onlineData.map(d => d.id));
+                players = players.filter(p => p.isLocal || p.isBot || activeRemoteIds.has(p.id));
+            });
+        }
+
+        function syncLocalPlayerToOnline() {
+            if (!isOnlineMode || !localPlayer || !window.OnlineEngine?.isAvailable()) return;
+            const now = Date.now();
+            if (now - lastSyncTime < 100) return;
+            lastSyncTime = now;
+
+            const db = window.OnlineEngine.db;
+            const appId = window.OnlineEngine.appId;
+            const user = window.OnlineEngine.getUser();
+            if (!user) return;
+
+            setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'players', user.uid), {
+                id: localPlayer.id,
+                name: localPlayer.name,
+                color: localPlayer.color,
+                x: localPlayer.x,
+                y: localPlayer.y,
+                angle: localPlayer.angle,
+                power: localPlayer.power,
+                updatedAt: Date.now()
+            }, { merge: true }).catch(() => {});
+        }
+
+        /* ==========================================================================
+           13. HUD & MINIMAP RENDERERS
+           ========================================================================== */
+        function announceFeed(msg) {
+            const feed = document.getElementById('killFeed');
+            const item = document.createElement('div');
+            item.className = 'hud-surface px-3.5 py-1.5 rounded-xl text-xs font-black text-amber-300 border border-amber-500/40 shadow-lg';
+            item.innerText = msg;
+            feed.appendChild(item);
+            setTimeout(() => { if (item.parentNode) item.parentNode.removeChild(item); }, 2800);
+        }
+
+        function updateHUD() {
+            if (!localPlayer) return;
+            document.getElementById('hudPowerText').innerText = Math.floor(localPlayer.power);
+            document.getElementById('hudKillsText').innerText = localPlayer.kills;
+
+            const indicator = document.getElementById('hudColorIndicator');
+            indicator.style.backgroundColor = localPlayer.color.hex;
+            indicator.style.color = '#ffffff';
+
+            const leaderboard = [...players].sort((a, b) => b.power - a.power).slice(0, 5);
+            const lbContainer = document.getElementById('leaderboardList');
+            lbContainer.innerHTML = '';
+
+            leaderboard.forEach((p, rank) => {
+                const row = document.createElement('div');
+                row.className = `flex justify-between items-center ${p.isLocal ? 'font-black text-cyan-300' : 'text-slate-300'}`;
+                row.innerHTML = `
+                    <span class="truncate max-w-[110px]">${rank + 1}. ${p.name}</span>
+                    <span class="font-bold text-amber-400">${Math.floor(p.power)}</span>
+                `;
+                lbContainer.appendChild(row);
+            });
+        }
+
+        function drawMinimap() {
+            minimapCtx.clearRect(0, 0, minimapCanvas.width, minimapCanvas.height);
+            const scale = minimapCanvas.width / WORLD_SIZE;
+
+            minimapCtx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+            minimapCtx.strokeRect(0, 0, minimapCanvas.width, minimapCanvas.height);
+
+            minimapCtx.fillStyle = '#f43f5e';
+            barriers.forEach(b => {
+                minimapCtx.fillRect((b.x - b.width / 2) * scale, (b.y - b.height / 2) * scale, b.width * scale, b.height * scale);
+            });
+
+            players.forEach(p => {
+                minimapCtx.fillStyle = p.isLocal ? '#06b6d4' : (p.isBot ? '#cbd5e1' : '#d946ef');
+                minimapCtx.beginPath();
+                minimapCtx.arc(p.x * scale, p.y * scale, p.isLocal ? 3.5 : 2, 0, Math.PI * 2);
+                minimapCtx.fill();
+            });
+        }
+
+        /* ==========================================================================
+           14. MAIN GAME LOOP
+           ========================================================================== */
+        function gameLoop() {
+            if (!isGameActive) return;
+
+            // Physics Update
+            players.forEach(p => p.update());
+            handleCollisions();
+            updateParticles();
+
+            // Camera Tracking
+            if (localPlayer) {
+                const targetCamX = localPlayer.x - window.innerWidth / 2;
+                const targetCamY = localPlayer.y - window.innerHeight / 2;
+                camera.x += (targetCamX - camera.x) * 0.12;
+                camera.y += (targetCamY - camera.y) * 0.12;
+
+                camera.x = Math.max(0, Math.min(WORLD_SIZE - window.innerWidth, camera.x));
+                camera.y = Math.max(0, Math.min(WORLD_SIZE - window.innerHeight, camera.y));
+
+                syncLocalPlayerToOnline();
+            }
+
+            // Crisp DPI Scaling Render Pass
+            ctx.save();
+            ctx.scale(devicePixelRatioScale, devicePixelRatioScale);
+            ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+
+            ctx.save();
+            ctx.translate(-camera.x, -camera.y);
+
+            // Arena Background Grid Lines
+            const gridSize = 120;
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            const startX = Math.floor(camera.x / gridSize) * gridSize;
+            const endX = startX + window.innerWidth + gridSize;
+            const startY = Math.floor(camera.y / gridSize) * gridSize;
+            const endY = startY + window.innerHeight + gridSize;
+
+            for (let x = startX; x < endX; x += gridSize) {
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, WORLD_SIZE);
+            }
+            for (let y = startY; y < endY; y += gridSize) {
+                ctx.moveTo(0, y);
+                ctx.lineTo(WORLD_SIZE, y);
+            }
+            ctx.stroke();
+
+            // Arena Boundaries
+            ctx.strokeStyle = '#06b6d4';
+            ctx.lineWidth = 8;
+            ctx.strokeRect(0, 0, WORLD_SIZE, WORLD_SIZE);
+
+            // Entities Rendering
+            foods.forEach(f => f.draw(ctx));
+            barriers.forEach(b => b.draw(ctx));
+            drawParticles(ctx);
+            players.forEach(p => p.draw(ctx));
+
+            ctx.restore();
+            ctx.restore();
+
+            updateHUD();
+            drawMinimap();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        /* ==========================================================================
+           15. CONTROLS & LISTENERS
+           ========================================================================== */
+        window.addEventListener('keydown', (e) => {
+            keys[e.code] = true;
+            if (e.code === 'Space' || e.code === 'ShiftLeft') isNitroActive = true;
+        });
+        window.addEventListener('keyup', (e) => {
+            keys[e.code] = false;
+            if (e.code === 'Space' || e.code === 'ShiftLeft') isNitroActive = false;
+        });
+
+        // Virtual Touch Joystick
+        const joystickZone = document.getElementById('joystickZone');
+        const joystickKnob = document.getElementById('joystickKnob');
+        let joystickCenter = { x: 0, y: 0 };
+
+        joystickZone.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            SoundFX.init();
+            const rect = joystickZone.getBoundingClientRect();
+            joystickCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+            handleJoystickTouch(e.touches[0]);
+        });
+
+        joystickZone.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (touchInput.active) handleJoystickTouch(e.touches[0]);
+        });
+
+        const resetJoystick = () => {
+            touchInput.active = false;
+            joystickKnob.style.transform = `translate(0px, 0px)`;
+        };
+
+        joystickZone.addEventListener('touchend', resetJoystick);
+        joystickZone.addEventListener('touchcancel', resetJoystick);
+
+        function handleJoystickTouch(touch) {
+            const dx = touch.clientX - joystickCenter.x;
+            const dy = touch.clientY - joystickCenter.y;
+            const dist = Math.hypot(dx, dy);
+            const maxRadius = 50;
+
+            touchInput.active = true;
+            touchInput.angle = Math.atan2(dy, dx);
+            touchInput.dist = Math.min(dist, maxRadius);
+
+            const knobX = Math.cos(touchInput.angle) * touchInput.dist;
+            const knobY = Math.sin(touchInput.angle) * touchInput.dist;
+            joystickKnob.style.transform = `translate(${knobX}px, ${knobY}px)`;
+        }
+
+        // Nitro Boost Button
+        const btnNitro = document.getElementById('btnNitro');
+        btnNitro.addEventListener('touchstart', (e) => { e.preventDefault(); isNitroActive = true; });
+        btnNitro.addEventListener('touchend', () => { isNitroActive = false; });
+        btnNitro.addEventListener('mousedown', () => { isNitroActive = true; });
+        btnNitro.addEventListener('mouseup', () => { isNitroActive = false; });
+
+        /* ==========================================================================
+           16. GAME START HANDLERS
+           ========================================================================== */
+        function startOfflineMode() {
+            SoundFX.init();
+            isOnlineMode = false;
+            document.getElementById('hudOnlineModeBadge').innerText = 'OFFLINE';
+            document.getElementById('hudOnlineModeBadge').className = 'text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 uppercase';
+            
+            initWorld();
+            const playerName = document.getElementById('playerNameInput').value.trim() || 'Sürücü';
+            
+            localPlayer = new Car('player_local', playerName, selectedColor, WORLD_SIZE / 2, WORLD_SIZE / 2, false, true);
+            players = [localPlayer];
+
+            for (let i = 0; i < 8; i++) spawnBot();
+            startGameUI();
+        }
+
+        function startOnlineMode() {
+            SoundFX.init();
+            isOnlineMode = true;
+            document.getElementById('hudOnlineModeBadge').innerText = 'ONLINE';
+            document.getElementById('hudOnlineModeBadge').className = 'text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-fuchsia-500/20 text-fuchsia-300 uppercase';
+
+            initWorld();
+            const playerName = document.getElementById('playerNameInput').value.trim() || 'Sürücü';
+            const user = window.OnlineEngine?.getUser();
+            const uid = user ? user.uid : 'p_' + Math.random().toString(36).substring(2, 8);
+
+            localPlayer = new Car(uid, playerName, selectedColor, WORLD_SIZE / 2, WORLD_SIZE / 2, false, true);
+            players = [localPlayer];
+
+            for (let i = 0; i < 5; i++) spawnBot();
+            setupOnlineMultiplayer();
+            startGameUI();
+        }
+
+        function startGameUI() {
+            isGameActive = true;
+            maxPowerAchieved = localPlayer.power;
+            document.getElementById('menuModal').classList.add('hidden');
+            document.getElementById('gameOverModal').classList.add('hidden');
+            document.getElementById('gameHud').classList.remove('hidden');
+            requestAnimationFrame(gameLoop);
+        }
+
+        document.getElementById('btnPlayOffline').onclick = startOfflineMode;
+        document.getElementById('btnPlayOnline').onclick = startOnlineMode;
+        document.getElementById('btnRestart').onclick = () => {
+            document.getElementById('gameOverModal').classList.add('hidden');
+            document.getElementById('menuModal').classList.remove('hidden');
+        };
+
+    </script>
+</body>
+</html>
